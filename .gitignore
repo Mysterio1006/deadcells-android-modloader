@@ -1,0 +1,41 @@
+# 绝不提交游戏资源 / 游戏本体（版权 + 体积）
+*.apk
+*.apks
+*.idsig
+*.pak
+*.cdb
+*.so
+*.dex
+*.odex
+*.vdex
+*.oat
+lib/
+assets/
+raw/
+dumps*/
+extracted*/
+out/
+work/
+build/
+*.log
+
+# 签名材料——绝不入库
+*.keystore
+*.jks
+*.p12
+*.pem
+*.RSA
+*.SF
+*.MF
+
+# Python
+__pycache__/
+*.pyc
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
+
+# 例外: 自有代码的预编译产物(方便直接使用)
+!src/libmodsrv.so
