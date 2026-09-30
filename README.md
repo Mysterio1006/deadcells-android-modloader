@@ -5,6 +5,8 @@
 > An external mod loader for **Dead Cells mobile (Chinese Bilibili release)**.
 > Install the loader-bearing APK **once**; afterwards drop mod files into a folder and they take effect with no repackaging.
 
+**📦 [下载 Mod 管理器 APK](https://github.com/Mysterio1006/deadcells-android-modloader/releases/latest/download/DeadCells-ModManager-v1.0.apk)** (25 KB) —— 可视化增删启停 mod，见 [`manager/`](manager/)
+
 ---
 
 ## ⚠️ 重要前提 / Important Caveats
@@ -118,6 +120,10 @@ adb install -r 签名版.apk
 
 [`manager/`](manager/) 是一个纯 Java 的 Mod 管理器 App（约 25 KB，零依赖）：
 列出、导入、启用/停用、删除 mod，并查看加载日志。
+
+**直接下载安装**：[DeadCells-ModManager-v1.0.apk](https://github.com/Mysterio1006/deadcells-android-modloader/releases/latest/download/DeadCells-ModManager-v1.0.apk)
+
+或者从源码构建（本机没有 Gradle 也能编，见 `manager/build.sh`）：
 
 ```bash
 cd manager && ./build.sh install
