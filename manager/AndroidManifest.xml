@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.dsharnessmobile.deadcells.modmanager"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="33" />
+
+    <!--
+      权限说明:
+      本 App 只往 /sdcard/Android/media/<游戏包名>/ 读写 mod.
+      该位置属于 Android 的"应用间共享媒体目录", 无需任何存储权限即可访问,
+      所以这里刻意不申请 READ/WRITE_EXTERNAL_STORAGE (申请了反而在
+      新系统上被限制). 安装 APK 需要 REQUEST_INSTALL_PACKAGES.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
+      Android/media/<包名>/ 在 Android 11+ 属于「共享存储」范畴：
+      目录本身可见 (exists/isDir/canRead 都为 true)，但没有权限时
+      listFiles() 会返回 0 —— 文件被 FUSE 层按 uid 过滤掉了。
+      实测必须持有 MANAGE_EXTERNAL_STORAGE 才能列/读写该目录。
+
+      作用域: 只在「所有文件访问」被授予时生效；未授予时 App 仍能打开，
+      只是列表为空并给出引导。
+    -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@android:style/Theme.Material.Light.DarkActionBar"
+        android:allowBackup="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".LogActivity"
+            android:exported="false"
+            android:label="@string/log_title"
+            android:parentActivityName=".MainActivity" />
+
+    </application>
+</manifest>

@@ -59,12 +59,31 @@
 #define TAG "DCMOD"
 
 // ---- mod 搜索目录 (按优先级) ----
-// /sdcard 根目录在 Android 11+ 作用域存储下即使有权限也读不了;
-// App 自己的 external files 目录 **无需权限** 即可读写, 故列为首选.
-#define MOD_DIR_COUNT 3
+//
+// 背景: 第三方 App 在 Android 11+ 无法访问别的应用的 Android/data 目录
+//       (FUSE 按 uid 遮蔽, 连 stat 都返回 ENOENT), 但 **任何 App 都能读写**
+//       /sdcard/Android/media/<包名>/ —— 这是 Android 官方的应用间共享位置.
+//
+// 因此 "外置 mod 管理器" 的架构是:
+//   管理器  -> 往 /sdcard/Android/media/<管理器包名>/mods/ 写 pak
+//   加载器  -> 跑在游戏进程内(拥有游戏全部权限), 从该目录读 pak
+// 两者零权限交集, 不需要 sharedUserId, 也不碰游戏身份/存档.
+//
+// 顺序: 管理器目录在前 —— 界面上显式安装的 mod 应压过手工放置的.
+#define MOD_DIR_COUNT 6
 static const char *MOD_DIRS[MOD_DIR_COUNT] = {
+    // ① 游戏自己的 media 目录 —— 关键: 属主是 game uid, 所以
+    //    游戏进程读得了; 而 Android 的 Android/media 是公开的,
+    //    别的 App(如外置管理器) 也写得进去. 这是唯一同时满足
+    //    "管理器可写 + 游戏可读" 的位置.
+    "/sdcard/Android/media/com.bilibili.deadcells.mobile/DeadCellsMods/",
+    "/storage/emulated/0/Android/media/com.bilibili.deadcells.mobile/DeadCellsMods/",
+    // 兼容: 管理器包名目录(实测游戏进程无 1078 组, 读不了, 保留仅为探测)
+    "/sdcard/Android/media/com.dsharnessmobile.deadcells.modmanager/mods/",
+    // ② 游戏自己的 external files 目录 (手工放置 mod 的经典位置)
     "/sdcard/Android/data/com.bilibili.deadcells.mobile/files/DeadCellsMods/",
     "/storage/emulated/0/Android/data/com.bilibili.deadcells.mobile/files/DeadCellsMods/",
+    // ③ 兼容旧路径 (作用域存储下通常不可用)
     "/sdcard/DeadCellsMods/",
 };
 
@@ -142,12 +161,21 @@ static int ext_for(const char *name, char *out, size_t cap) {
     const char *b = strrchr(name, '/');
     b = b ? b + 1 : name;
     if (!*b || strstr(b, "..")) return 0;
-    struct stat st;
     for (int i = 0; i < MOD_DIR_COUNT; i++) {
         snprintf(out, cap, "%s%s", MOD_DIRS[i], b);
-        if (stat(out, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 100)
-            return 1;
+        // ⚠ 必须用 open 判定, 不能用 stat.
+        //   FUSE 上 stat 与实际可读性会不一致: 明明目录里没有这个文件,
+        //   stat 仍可能成功, 而 open 才返回 ENOENT/EACCES. 只看 stat 会
+        //   走进"以为有外部文件 -> open 失败 -> 退回内置"的误导性分支,
+        //   日志里就会出现莫名的 Permission denied.
+        int fd = open(out, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) continue;
+        struct stat st;
+        int ok = (fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 100);
+        close(fd);
+        if (ok) return 1;
     }
+    out[0] = 0;
     return 0;
 }
 
@@ -158,13 +186,8 @@ static int ext_for(const char *name, char *out, size_t cap) {
 static int my_assets_exists(const char *name) {
     char ext[600];
     if (ext_for(name, ext, sizeof ext)) {
-        int fd = open(ext, O_RDONLY | O_CLOEXEC);
-        if (fd >= 0) {
-            close(fd);
-            if (g_seen < 60) flog("assets_exists(\"%s\") -> 外部可读, 返回 1", name);
-            return 1;
-        }
-        flog("assets_exists(\"%s\") -> open 失败: %s", name, strerror(errno));
+        if (g_seen < 60) flog("assets_exists(\"%s\") -> 外部可读, 返回 1", name);
+        return 1;
     }
     int r = real_assets_exists ? real_assets_exists(name) : 0;
     if (strstr(name ? name : "", ".pak") && g_seen < 60) {

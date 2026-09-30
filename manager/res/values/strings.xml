@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">细胞 Mod 管理器</string>
+    <string name="log_title">加载日志</string>
+
+    <string name="dir_label">Mod 目录</string>
+    <string name="btn_import">导入 Mod</string>
+    <string name="btn_refresh">刷新</string>
+    <string name="btn_log">加载日志</string>
+    <string name="btn_install_loader">安装加载器</string>
+    <string name="btn_help">说明</string>
+
+    <string name="empty_hint">还没有 Mod。\n点「导入 Mod」选一个 .pak 文件。</string>
+    <string name="state_on">已启用</string>
+    <string name="state_off">已停用</string>
+    <string name="enabled_suffix">.pak</string>
+    <string name="disabled_suffix">.pak.off</string>
+
+    <string name="menu_enable">启用</string>
+    <string name="menu_disable">停用</string>
+    <string name="menu_delete">删除</string>
+    <string name="menu_info">详情</string>
+
+    <string name="dlg_delete_title">删除 Mod</string>
+    <string name="dlg_delete_msg">确定删除 %1$s ?</string>
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+</resources>

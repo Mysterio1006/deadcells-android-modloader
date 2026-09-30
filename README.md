@@ -59,6 +59,31 @@ assets_exists("res5.pak")            assets_exists("res5.pak")
 > 关键点: **只 hook `assets_read` 是不够的** —— 引擎会先问 `assets_exists`，
 > 返回 false 就直接 `break`，读取函数根本不会被调用。
 
+### 外载目录怎么选
+
+加载器会依次搜索这几个目录（见 `src/modsrv.c` 的 `MOD_DIRS`）：
+
+```
+① /sdcard/Android/media/<游戏包名>/DeadCellsMods/     ← 管理器写入的位置
+② /sdcard/Android/data/<游戏包名>/files/DeadCellsMods/
+③ /sdcard/DeadCellsMods/                              （兼容旧路径）
+```
+
+为什么是①这个看起来有点怪的位置，值得说明 —— 因为要同时满足两个约束：
+
+| 位置 | 管理器能写? | 游戏能读? | 原因 |
+|---|---|---|---|
+| `Android/data/<游戏>/files/` | ❌ | ✅ | FUSE 按 uid 遮蔽，第三方 App **连 stat 都 ENOENT** |
+| `Android/media/<管理器包名>/` | ✅ | ❌ | 属主是管理器 uid，游戏进程**不在 `ext_data_rw` 组** |
+| **`Android/media/<游戏包名>/`** | ✅ | ✅ | **唯一交集** |
+
+关键点：`Android/media/<包名>/` 的**属主是那个包自己的 uid**。
+挂在**游戏包名**下，游戏进程天然有权限读；而 `Android/media` 对整个系统公开，
+别的 App 也写得进去 —— 这就是"共生"的技术基础。
+
+> 实测坑：该目录下的文件在 FUSE 层都被映射成 `media_rw` 属主，
+> `chmod` 会"成功"但权限位**不变**。别指望靠改权限打通访问。
+
 ---
 
 ## 使用
@@ -87,9 +112,36 @@ adb install -r 签名版.apk
 
 ### 4. 放 mod
 
+有两种方式。
+
+#### 方式 A：用可视化 Mod 管理器（推荐）
+
+[`manager/`](manager/) 是一个纯 Java 的 Mod 管理器 App（约 25 KB，零依赖）：
+列出、导入、启用/停用、删除 mod，并查看加载日志。
+
 ```bash
-# 外载目录（必须是 App 私有 external 目录，见下方说明）
+cd manager && ./build.sh install
+```
+
+它把 mod 写到这个目录（**唯一同时满足「管理器可写 + 游戏可读」的位置**）：
+
+```
+/sdcard/Android/media/com.bilibili.deadcells.mobile/DeadCellsMods/
+```
+
+> **首次使用需要授予「所有文件访问」权限**，App 会主动引导。
+> 没有该权限时目录的 `exists()/canRead()` 都返回 `true`，
+> 但 `listFiles()` **静默返回空** —— 不报错，只表现为"列表是空的"。
+> 详见 [docs/Mod管理器.md](docs/Mod管理器.md)。
+
+#### 方式 B：手工放文件
+
+```bash
+# 游戏自己的 external 目录
 /sdcard/Android/data/com.bilibili.deadcells.mobile/files/DeadCellsMods/
+
+# 或上面那个 media 目录（两个都会被加载器搜索）
+/sdcard/Android/media/com.bilibili.deadcells.mobile/DeadCellsMods/
 ```
 
 之后进游戏即生效，**加/换 mod 都不用再动 APK**。
@@ -101,6 +153,11 @@ python3 tools/modctl.py push 我的mod.pak   # 推送
 python3 tools/modctl.py list               # 查看
 python3 tools/modctl.py log                # 看加载日志
 ```
+
+> ⚠️ **文件名决定它覆盖哪个包**。加载器按 basename 精确匹配引擎请求的资源名，
+> 所以 mod 必须叫 `res5.pak` / `res3.pak` 这类名字才会生效。
+> `我的强力mod.pak` **不会生效** —— 加载器不会把它当作任何资源的替代品。
+> 管理器在导入时会检查并提醒这一点。
 
 ### 5. 验证
 
@@ -174,6 +231,15 @@ docs/
   逆向分析笔记.md   开发过程中的原始分析记录
   PAK格式与改包指南.md
   PAK头修复.md
+  Mod管理器.md     管理器 App 的设计/权限模型/无 Gradle 构建
+manager/          可视化 Mod 管理器（纯 Java，无第三方依赖）
+  AndroidManifest.xml
+  build.sh        aapt2 + javac + d8 + apksigner 手工构建（无 Gradle）
+  res/
+  src/com/dsharnessmobile/deadcells/modmanager/
+    ModRepo.java      目录定位 / 枚举 / 增删 / 权限 / 日志
+    MainActivity.java 列表、导入、启停、删除
+    LogActivity.java  日志查看与导出
 ```
 
 ---
