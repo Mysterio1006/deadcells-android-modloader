@@ -1,4 +1,4 @@
-// modsrv.c — 外部 mod 加载器 v5
+// modsrv.c — 外部 mod 加载器 v7 (终版)
 //
 // ================= 引擎 pak 加载链 (反汇编确认) =================
 //
@@ -6,7 +6,7 @@
 //     loop i=1..:
 //       path = "res"+i+".pak"
 //       if (!assets_exists(path)) break;        <-- 闸门 A
-//       fd   = File_read(path, 0)
+//       fd   = File_read(path, 1)
 //       addPak(fd)
 //
 //   File_read (0x22eb3bc):
@@ -32,7 +32,7 @@
 // 引擎随后拿它当 **表索引** 去索引 T_FILE -> 读到垃圾指针 -> fread 崩.
 // 崩溃栈: addPak -> Reader_readHeader -> haxe_io_Input_readString 完全吻合.
 //
-// ================= v5 策略 =================
+// ================= v7 策略 =================
 // 只 hook 两个 C 层函数, 完全不碰 Haxe 对象:
 //   assets_exists(path)      : 外部有 -> 返回 1 (让循环别提前退出)
 //   android_fs_assets_read() : 外部有 -> 自己 fopen + 填三张表 -> 返回索引
@@ -350,7 +350,7 @@ __attribute__((constructor))
 static void modsrv_init(void) {
     for (int i = 0; i < MOD_DIR_COUNT; i++) mkdir(MOD_DIRS[i], 0777);
     flog("==========================================");
-    flog("modsrv 外载加载器 v5 ENTER pid=%d", getpid());
+    flog("modsrv 外载加载器 v7 ENTER pid=%d", getpid());
     pthread_t t;
     if (pthread_create(&t, NULL, hook_thread, NULL) == 0) pthread_detach(t);
     flog("ctor EXIT");
